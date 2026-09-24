@@ -31,6 +31,8 @@ def translate_note():
         current_app.logger.warning('Translation unavailable: OpenRouter API key is not configured')
         return jsonify({'error': 'OpenRouter API key is not configured'}), 503
 
+    response = None
+    payload = None
     try:
         for _ in range(2):
             response = httpx.post(
@@ -47,7 +49,8 @@ def translate_note():
                 timeout=30.0,
             )
             response.raise_for_status()
-            choice = response.json()['choices'][0]
+            payload = response.json()
+            choice = payload['choices'][0]
             if choice.get('finish_reason') == 'length':
                 current_app.logger.warning('Translation cut off: input_chars=%s language=%s', len(text), language)
                 return jsonify({'error': 'Translation was cut off; try shorter note content'}), 502
@@ -61,7 +64,11 @@ def translate_note():
         if error.response.status_code in (401, 402, 403):
             return jsonify({'error': 'OpenRouter key or account cannot access this model'}), 503
         return jsonify({'error': 'Translation service failed; please retry'}), 502
-    except (httpx.RequestError, ValueError, KeyError, IndexError, TypeError) as error:
+    except KeyError as error:
+        missing_field = error.args[0] if error.args and error.args[0] in ('choices', 'message', 'content') else 'other'
+        current_app.logger.warning('Translation upstream response missing field: field=%s status=%s has_error=%s input_chars=%s language=%s', missing_field, response.status_code if response is not None else None, isinstance(payload, dict) and 'error' in payload, len(text), language)
+        return jsonify({'error': 'Translation service failed; please retry'}), 502
+    except (httpx.RequestError, ValueError, IndexError, TypeError) as error:
         current_app.logger.warning('Translation upstream request or response error: type=%s input_chars=%s language=%s', type(error).__name__, len(text), language)
         return jsonify({'error': 'Translation service failed; please retry'}), 502
 
