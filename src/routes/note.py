@@ -50,6 +50,17 @@ def translate_note():
             )
             response.raise_for_status()
             payload = response.json()
+            if isinstance(payload, dict) and payload.get('error') is not None:
+                error_data = payload['error']
+                error_code = error_data.get('code') if isinstance(error_data, dict) else None
+                if type(error_code) is not int or not 100 <= error_code <= 599:
+                    error_code = None
+                current_app.logger.warning('Translation upstream error envelope: status=%s code=%s input_chars=%s language=%s', response.status_code, error_code, len(text), language)
+                if error_code == 429:
+                    return jsonify({'error': 'Translation is rate limited; please retry shortly'}), 429
+                if error_code in (401, 402, 403):
+                    return jsonify({'error': 'OpenRouter key or account cannot access this model'}), 503
+                return jsonify({'error': 'Translation service failed; please retry'}), 502
             choice = payload['choices'][0]
             if choice.get('finish_reason') == 'length':
                 current_app.logger.warning('Translation cut off: input_chars=%s language=%s', len(text), language)
