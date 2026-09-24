@@ -5,12 +5,12 @@ from supabase import create_client
 
 
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
-config = dotenv_values(env_path)
+config = {**dotenv_values(env_path), **os.environ}
 supabase_url = config.get('SUPABASE_URL')
 supabase_key = config.get('SUPABASE_KEY')
 
 if not supabase_url or not supabase_key:
-    raise RuntimeError('Set SUPABASE_URL and SUPABASE_KEY in the project-root .env file')
+    raise RuntimeError('Set SUPABASE_URL and SUPABASE_KEY as environment variables or in the project-root .env file')
 if not supabase_url.startswith('https://'):
     raise RuntimeError('SUPABASE_URL must be the HTTPS project URL from Supabase, not a Postgres URI')
 if supabase_key.startswith('sb_publishable_'):
