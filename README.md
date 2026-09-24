@@ -110,6 +110,8 @@ OPENROUTER_API_KEY=YOUR_OPENROUTER_API_KEY
 
 The key stays on the Flask server. Restart Flask after adding it. Translation is optional; notes still work without it. Clicking **Translate** sends the current note content to OpenRouter using `nvidia/nemotron-3-ultra-550b-a55b:free` and shows a preview. **Use translation** replaces the editor content and saves it; **Discard** leaves the note unchanged. Never commit or expose the API key in browser code. The free model may be rate limited or temporarily unavailable.
 
+After deploying, inspect Vercel's runtime logs for `Translation` warnings when a request fails. The warnings distinguish upstream HTTP status codes, request errors (including timeouts), truncated responses, and empty responses without recording note content or the API key. Vercel retains logs according to your project's plan and settings; local log files are not durable on Vercel. Logs from requests before this version was deployed cannot be recovered from these new warnings.
+
 ### Vercel Configuration
 
 In your Vercel project, add `SUPABASE_URL` and `SUPABASE_KEY` under **Settings > Environment Variables** for the environments you deploy to (such as Production and Preview). Add `OPENROUTER_API_KEY` there too if you use translation. Use the Supabase HTTPS project URL and a server-side secret key. Redeploy after saving or changing the variables; Vercel does not use your local `.env` file.

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 import httpx
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from src.supabase_client import config, supabase
 
 note_bp = Blueprint('note', __name__)
@@ -28,6 +28,7 @@ def translate_note():
 
     api_key = config.get('OPENROUTER_API_KEY')
     if not api_key:
+        current_app.logger.warning('Translation unavailable: OpenRouter API key is not configured')
         return jsonify({'error': 'OpenRouter API key is not configured'}), 503
 
     try:
@@ -48,19 +49,23 @@ def translate_note():
             response.raise_for_status()
             choice = response.json()['choices'][0]
             if choice.get('finish_reason') == 'length':
+                current_app.logger.warning('Translation cut off: input_chars=%s language=%s', len(text), language)
                 return jsonify({'error': 'Translation was cut off; try shorter note content'}), 502
             translation = choice['message']['content']
             if isinstance(translation, str) and translation.strip():
                 return jsonify({'translation': translation.strip()})
     except httpx.HTTPStatusError as error:
+        current_app.logger.warning('Translation upstream HTTP error: status=%s input_chars=%s language=%s', error.response.status_code, len(text), language)
         if error.response.status_code == 429:
             return jsonify({'error': 'Translation is rate limited; please retry shortly'}), 429
         if error.response.status_code in (401, 402, 403):
             return jsonify({'error': 'OpenRouter key or account cannot access this model'}), 503
         return jsonify({'error': 'Translation service failed; please retry'}), 502
-    except (httpx.RequestError, ValueError, KeyError, IndexError, TypeError):
+    except (httpx.RequestError, ValueError, KeyError, IndexError, TypeError) as error:
+        current_app.logger.warning('Translation upstream request or response error: type=%s input_chars=%s language=%s', type(error).__name__, len(text), language)
         return jsonify({'error': 'Translation service failed; please retry'}), 502
 
+    current_app.logger.warning('Translation upstream returned no text: input_chars=%s language=%s', len(text), language)
     return jsonify({'error': 'Translation service returned no text; please retry'}), 502
 
 @note_bp.route('/notes', methods=['GET'])
